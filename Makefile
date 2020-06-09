@@ -1,10 +1,10 @@
-GPU=0
-CUDNN=0
-CUDNN_HALF=0
-OPENCV=0
-AVX=0
-OPENMP=0
-LIBSO=0
+GPU=1
+CUDNN=1
+CUDNN_HALF=1
+OPENCV=1
+AVX=1
+OPENMP=1
+LIBSO=1
 ZED_CAMERA=0 # ZED SDK 3.0 and above
 ZED_CAMERA_v2_8=0 # ZED SDK 2.X
 
@@ -12,14 +12,14 @@ ZED_CAMERA_v2_8=0 # ZED SDK 2.X
 # set CUDNN_HALF=1 to further speedup 3 x times (Mixed-precision on Tensor Cores) GPU: Volta, Xavier, Turing and higher
 # set AVX=1 and OPENMP=1 to speedup on CPU (if error occurs then set AVX=0)
 
-USE_CPP=0
-DEBUG=0
+USE_CPP=1
+DEBUG=1
 
-ARCH= -gencode arch=compute_30,code=sm_30 \
-      -gencode arch=compute_35,code=sm_35 \
-      -gencode arch=compute_50,code=[sm_50,compute_50] \
-      -gencode arch=compute_52,code=[sm_52,compute_52] \
-	    -gencode arch=compute_61,code=[sm_61,compute_61]
+# ARCH= -gencode arch=compute_30,code=sm_30 \
+#       -gencode arch=compute_35,code=sm_35 \
+#       -gencode arch=compute_50,code=[sm_50,compute_50] \
+#       -gencode arch=compute_52,code=[sm_52,compute_52] \
+# 	    -gencode arch=compute_61,code=[sm_61,compute_61]
 
 OS := $(shell uname)
 
@@ -27,7 +27,7 @@ OS := $(shell uname)
 # ARCH= -gencode arch=compute_70,code=[sm_70,compute_70]
 
 # GeForce RTX 2080 Ti, RTX 2080, RTX 2070, Quadro RTX 8000, Quadro RTX 6000, Quadro RTX 5000, Tesla T4, XNOR Tensor Cores
-# ARCH= -gencode arch=compute_75,code=[sm_75,compute_75]
+ARCH= -gencode arch=compute_75,code=[sm_75,compute_75]
 
 # Jetson XAVIER
 # ARCH= -gencode arch=compute_72,code=[sm_72,compute_72]
@@ -84,13 +84,6 @@ ifneq (,$(findstring MSYS_NT,$(OS)))
 LDFLAGS+=-lws2_32
 endif
 
-ifeq ($(OPENCV), 1)
-COMMON+= -DOPENCV
-CFLAGS+= -DOPENCV
-LDFLAGS+= `pkg-config --libs opencv4 2> /dev/null || pkg-config --libs opencv`
-COMMON+= `pkg-config --cflags opencv4 2> /dev/null || pkg-config --cflags opencv`
-endif
-
 ifeq ($(OPENMP), 1)
 CFLAGS+= -fopenmp
 LDFLAGS+= -lgomp
@@ -109,11 +102,11 @@ endif
 ifeq ($(CUDNN), 1)
 COMMON+= -DCUDNN
 ifeq ($(OS),Darwin) #MAC
-CFLAGS+= -DCUDNN -I/usr/local/cuda/include
-LDFLAGS+= -L/usr/local/cuda/lib -lcudnn
+CFLAGS+= -DCUDNN -I/usr/local/cudnn
+LDFLAGS+= -L/usr/local/cudnn -lcudnn
 else
-CFLAGS+= -DCUDNN -I/usr/local/cudnn/include
-LDFLAGS+= -L/usr/local/cudnn/lib64 -lcudnn
+CFLAGS+= -DCUDNN -I/usr/local/cudnn
+LDFLAGS+= -L/usr/local/cudnn -lcudnn
 endif
 endif
 
@@ -121,6 +114,36 @@ ifeq ($(CUDNN_HALF), 1)
 COMMON+= -DCUDNN_HALF
 CFLAGS+= -DCUDNN_HALF
 ARCH+= -gencode arch=compute_70,code=[sm_70,compute_70]
+endif
+
+ifeq ($(OPENCV), 1)
+COMMON+= -DOPENCV
+CFLAGS+= -DOPENCV
+LDFLAGS+= `pkg-config --libs opencv4 2> /dev/null || pkg-config --libs opencv` \
+		#   -L/data/container_testing/yarimca_backup/recognition/env/lib \
+		  -Wl,-rpath,/data/container_testing/yarimca_backup/recognition/env/lib
+		# NOTE: may successfully compile but cannot use libdarknet.so
+		# because of incompatible cuda version, so this code block should lie
+		# below cuda (gpu) block
+		### opencv4
+		#   -L/home/ubuntu/miniconda3/pkgs/libopencv-4.2.0-py37_5/lib \
+		#   -L/home/ubuntu/miniconda3/pkgs/jpeg-9c-h14c3975_1001/lib \
+		#   -L/home/ubuntu/miniconda3/pkgs/jasper-1.900.1-hd497a04_4/lib \
+		#   -L/home/ubuntu/miniconda3/pkgs/libwebp-1.0.1-h8e7db2f_0/lib \
+		#   -Wl,-rpath,/home/ubuntu/miniconda3/pkgs/libopencv-4.2.0-py37_5/lib\
+		#   -Wl,-rpath,/home/ubuntu/miniconda3/pkgs/jpeg-9c-h14c3975_1001/lib\
+		#   -Wl,-rpath,/home/ubuntu/miniconda3/pkgs/jasper-1.900.1-hd497a04_4/lib\
+		#   -Wl,-rpath,/home/ubuntu/miniconda3/pkgs/libwebp-1.0.1-h8e7db2f_0/lib
+		### opencv3
+		# -L/home/ubuntu/miniconda3/pkgs/jpeg-9c-h14c3975_1001/lib \
+		# -L/home/ubuntu/miniconda3/pkgs/jasper-2.0.14-h07fcdf6_1/lib \
+		# -L/home/ubuntu/miniconda3/pkgs/libopencv-3.4.2-hb342d67_1/lib \
+		# -Wl,-rpath,/home/ubuntu/miniconda3/pkgs/jpeg-9c-h14c3975_1001/lib\
+		# -Wl,-rpath,/home/ubuntu/miniconda3/pkgs/jasper-2.0.14-h07fcdf6_1/lib\
+		# -Wl,-rpath,/home/ubuntu/miniconda3/pkgs/libopencv-3.4.2-hb342d67_1/lib
+COMMON+= `pkg-config --cflags opencv4 2> /dev/null || pkg-config --cflags opencv` \
+		 -I/data/container_testing/yarimca_backup/recognition/env/include/opencv4
+		#-I/home/ubuntu/miniconda3/pkgs/libopencv-4.2.0-py37_5/include/opencv4
 endif
 
 ifeq ($(ZED_CAMERA), 1)
